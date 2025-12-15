@@ -26,21 +26,100 @@ Methods:
 Remember:
 Always ensure that your helper methods are bulk-safe to handle multiple records efficiently. 
 */
-public with sharing class AccountHelper {
+public with sharing class AccountHelper extends TriggerHandler {
     
-    public void setTypeProspect(SObject objects){
-
+    public override void beforeInsert() {
+        setTypeProspect(Trigger.new);
+        addressCopy(Trigger.new);
+        setRating(Trigger.new);
+    }
+    public override void afterInsert() {
+        createDefaultContact(Trigger.new);
     }
 
-    void addressCopy(){
+    /*
+    * setTypeProspect
+    * When an account is inserted change the account type to 'Prospect' if there is no value in the type field.
+    * Trigger should only fire on insert.
+    */
+    private void setTypeProspect(List<SObject> objects){
 
+        Schema.SObjectType objType = objects.getSObjectType();
+        if (objType == Schema.Account.SObjectType) { // Check if it's an Account    SObjectType
+            List<Account> accounts = (List<Account>)objects; // Cast the whole list
+        
+            for (Account acc : accounts) {   
+                    if (acc.Type == null) {acc.Type = 'Prospect';}   
+            }    
+        }
+    }
+ 
+    /*
+    * addressCopy
+    * When an account is inserted copy the shipping address to the billing address.
+    * Trigger should only fire on insert.
+    */
+    private void addressCopy(List<SObject> objects){
+
+        Schema.SObjectType objType = objects.getSObjectType();
+        if (objType == Schema.Account.SObjectType) { // Check if it's an Account    SObjectType
+            List<Account> accounts = (List<Account>)objects; // Cast the whole list
+    
+
+            for (Account acc : accounts) {
+                if (acc.ShippingStreet != null) {acc.BillingStreet = acc.ShippingStreet;}
+                if (acc.ShippingCity != null) {acc.BillingCity = acc.ShippingCity;}
+                if (acc.ShippingState != null) {acc.BillingState = acc.ShippingState;}
+                if (acc.ShippingPostalCode != null) {acc.BillingPostalCode = acc.ShippingPostalCode;}
+                if (acc.ShippingCountry != null) {acc.BillingCountry = acc.ShippingCountry;}
+            }               
+        }    
     }
 
-    //[public | private ] [static] data_type setRating (input parameters) {
-    //  The body of the method
-    //}
+    
+    /*
+    * setRating
+    * When an account is inserted set the rating to 'Hot' if the Phone, Website, and Fax is not empty.
+    * Trigger should only fire on insert.
+    */
+    private void setRating(List<SObject> objects){
 
-    //[public | private ] [static] data_type defaultContact (input parameters) {
-    //  The body of the method
-    //}
+        Schema.SObjectType objType = objects.getSObjectType();
+        if (objType == Schema.Account.SObjectType) { // Check if it's an Account    SObjectType
+            List<Account> accounts = (List<Account>)objects; // Cast the whole list
+        
+            for (Account acc : accounts) {   
+                    if (acc.Phone != null && acc.Website != null && acc.Fax != null) {
+                        acc.Rating = 'Hot';
+                    }   
+            }    
+        }
+    }
+ 
+    /*
+    * createDefaultContact
+    * When an account is inserted create a contact related to the account with the following default values:
+    * LastName = 'DefaultContact'
+    * Email = 'default@email.com'
+    * Trigger should only fire on insert.
+    */    
+    private void createDefaultContact(List<SObject> objects){
+
+        Schema.SObjectType objType = objects.getSObjectType();
+        if (objType == Schema.Account.SObjectType) {  
+            List<Account> accounts = (List<Account>)objects; // Cast the whole list
+            List<Contact> contacts = new List<Contact>();   
+            for(Account acc : accounts){
+                Contact con = new Contact();
+                con.LastName = 'DefaultContact';
+                con.Email = 'default@email.com';
+                con.AccountId = acc.Id;
+                contacts.add(con);
+            }
+            insert contacts; 
+        }
+        
+    }
+
+
 }
